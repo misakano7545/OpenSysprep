@@ -328,3 +328,15 @@ Rust 侧：**不实现**（该载荷属于防流氓/KR 线专属，功能不在�
 | `funn_family_compare.log` / `funnkr_diff.log` | 变体差集原始输出 |
 | `work/pubce/` | `PUBCE` 解包产物（245 文件，Inno Setup 5.6.0） |
 | `work/engines/` 与 `work/engines-orig-unp/` | 脱壳模块 / 从原包独立重脱壳的校验副本 |
+
+### 7.1 主程序全量反汇编（objdump 线性扫描）
+
+| 产物（本机 `scpt-analysis/05-decompiled/`，不入库） | 规模 | 校验 |
+|---|---|---|
+| `Scpt.text.asm` | 2,164,808 行 / 65.8 MB / 24.5 s | 地址 `0x401000`–`0x95d266`，字节跨度 5,620,326 / 5,623,808 = **99.94%**；`(bad)` 1.43%；stderr 空 |
+| `Scpt.itext.asm` | 3,613 行（含入口 VA `0x961280`） | 入口为 Delphi 标准序（`push ebp; mov ebp,esp; add esp,-16; …`） |
+
+- 生成脚本：`tools/scpt/disasm.sh`（只读，不执行样本）；完整说明见 `docs/analysis/disassembly.md`（本机副本 `scpt-analysis/05-decompiled/README.md`）
+- **可导航**：直接 `call/jmp` 已解析成绝对地址 → `grep -n -m1 -A30 "^  625378:"` 即可跳进目标；地址为**无前导零**小写十六进制
+- **局限**（实测）：① 线性扫描分不清 `.text` 里的数据（Delphi 把 RTTI/resourcestring/窗体表放在 `.text`）→ 指令级计数不可全信，读语义需 IDR/Ghidra/`r2 -A`；② 无符号；③ **不能按 API 名 grep 调用点**（API 走运行期解析，且重建镜像把尾部节区并进 `.rsrc`，PE 导入视图不可靠）
+- Delphi 补名办法（任何反汇编器都要做）：**DFM 事件名 = 真实函数名** + VMT/RTTI 里的类名/单元名（已提取 76 个单元名、7 个窗体类）+ `register` 调用约定人工校正

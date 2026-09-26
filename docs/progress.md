@@ -64,3 +64,11 @@
 - **具体动作无据可证**：无字符串/资源可依，只到"载荷形态"为止（不猜功能）
 - **语境**：`3.0.0.122` 防删除保护、`3.0.0.119` 配置加密、`3.0.0.98` 防劫持——均**仅 防流氓/大客户 两种封装方式**
 - **附带查获**：内嵌 ZIP `ScProtect_{7,8,81,10}x64.sys` 驱动包；驱动伪装名确认（`Microsoft Time-Stamp Service` / `WoSign Time Stamping Service`）；`ScProtect` 仅被 KR/防流氓线引用（`FUNMKR`/`FUNMKRX64` 各 10 处）；`Scoem/` OEM 素材 223 成员清单
+
+## 主程序全量反汇编（objdump，完成）
+
+- 产物：`scpt-analysis/05-decompiled/Scpt.text.asm`（**2,164,808 行 / 65.8 MB**，24.5 s）+ `Scpt.itext.asm`（3,613 行）+ `README.md`；生成脚本 `tools/scpt/disasm.sh`
+- 校验：地址 `0x401000`–`0x95d266`，字节覆盖 **99.94%**（5,620,326 / 5,623,808），`(bad)` 1.43%，stderr 空；入口 VA `0x961280` 为标准 Delphi 序
+- 导航能力：直接 `call/jmp` 已解析为绝对地址（`call 0x40f58c` 可直接 grep 跳转）→ 可人工顺调用图读
+- 明确局限：① `.text` 里的数据（Delphi RTTI/resourcestring/窗体表）会被当指令，指令计数不可全信；② 无符号；③ 不能按 API 名 grep 调用点（运行期解析 + 重建镜像尾部节区并入 `.rsrc`，PE 导入视图不可靠）
+- 未做（另需环境）：递归下降反汇编器的函数级伪代码（Ghidra 需 ≥4 GB RAM，本机 1.96 GB/可用 0.8 GB 不达标）；Delphi 专用 IDR/DeDe 需 Windows
