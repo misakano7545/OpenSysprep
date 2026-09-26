@@ -72,3 +72,10 @@
 - 导航能力：直接 `call/jmp` 已解析为绝对地址（`call 0x40f58c` 可直接 grep 跳转）→ 可人工顺调用图读
 - 明确局限：① `.text` 里的数据（Delphi RTTI/resourcestring/窗体表）会被当指令，指令计数不可全信；② 无符号；③ 不能按 API 名 grep 调用点（运行期解析 + 重建镜像尾部节区并入 `.rsrc`，PE 导入视图不可靠）
 - 未做（另需环境）：递归下降反汇编器的函数级伪代码（Ghidra 需 ≥4 GB RAM，本机 1.96 GB/可用 0.8 GB 不达标）；Delphi 专用 IDR/DeDe 需 Windows
+
+## 函数级导航（替代反编译器，完成）
+
+- 结论：**不装反编译器也能做函数级定位**。前提实测成立——Delphi 2009+ 字符串常量是 UTF-16 且在 `.text` 内，代码用绝对地址引用（3,750/9,503 命中）
+- 产物：`tools/scpt/xref.py` → `functions.tsv`（72,640 边界）+ `literal-xref.tsv`（**9,422 引用**：API 4,197 / 路径 490 / 注册表 27 / URL 20）
+- 直接定位到的行为锚点：**上报计费**（`api.sysceo.cn/apps?us=` @ `0x008d1284`；`lm.sysceo.cn/getScauth` @ `0x008e275d`）、**授权登录门槛**（`This mode needs to log in to the Sysceo.cn account`）、**HAL 设备清理**（`reg delete ...\Enum\Root\ACPI_HAL /f` @ `0x008affcd`）、**驱动签名策略**（`0x0090d037`）、**intelppm 电源服务**（`0x0090ec52`）、**USBSTOR AutoRun**（`0x0091da57`）、**SRS 驱动加载/卸载主流程**（`0x008b47e1`、`0x0090fa89`）
+- 边界（已写入文档）：回答"谁写了这条注册表/路径/URL"，不回答"谁调用了静态导入 API"；函数数偏多（含数据误判），用作最近起点

@@ -340,3 +340,4 @@ Rust 侧：**不实现**（该载荷属于防流氓/KR 线专属，功能不在�
 - **可导航**：直接 `call/jmp` 已解析成绝对地址 → `grep -n -m1 -A30 "^  625378:"` 即可跳进目标；地址为**无前导零**小写十六进制
 - **局限**（实测）：① 线性扫描分不清 `.text` 里的数据（Delphi 把 RTTI/resourcestring/窗体表放在 `.text`）→ 指令级计数不可全信，读语义需 IDR/Ghidra/`r2 -A`；② 无符号；③ **不能按 API 名 grep 调用点**（API 走运行期解析，且重建镜像把尾部节区并进 `.rsrc`，PE 导入视图不可靠）
 - Delphi 补名办法（任何反汇编器都要做）：**DFM 事件名 = 真实函数名** + VMT/RTTI 里的类名/单元名（已提取 76 个单元名、7 个窗体类）+ `register` 调用约定人工校正
+- **函数图 + 字面量 xref**（`tools/scpt/xref.py`，替代反编译器）：72,640 函数边界 + 9,422 条字面量引用 → 直接得到「哪个函数写了哪条注册表/路径/URL」；已定位上报计费接口（`api.sysceo.cn`、`lm.sysceo.cn/getScauth`）、HAL 设备清理、驱动签名策略、SRS 驱动加载等锚点。详见 `docs/analysis/disassembly.md`
