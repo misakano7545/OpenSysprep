@@ -2,6 +2,8 @@
 //!
 //! 无参数启动 = GUI（对齐原工具体验）；功能子命令按 docs/spec/ 逐个对接。
 
+mod config;
+mod doctor;
 mod gui;
 
 use std::env;
@@ -48,6 +50,15 @@ fn main() -> ExitCode {
                 ExitCode::from(1)
             }
         },
+        Some("doctor") => {
+            let report = doctor::run(std::path::Path::new("."));
+            print!("{report}");
+            if report.passed() {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(1)
+            }
+        }
         Some(other) => {
             eprintln!("未知命令: {other}");
             eprintln!();
