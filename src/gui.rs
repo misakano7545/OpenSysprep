@@ -16,6 +16,8 @@ pub const PAGES: &[(&str, &str)] = &[
 #[derive(Default)]
 pub struct App {
     page: usize,
+    /// 封装页体检报告（None = 尚未体检）。
+    doctor_report: Option<crate::doctor::Report>,
 }
 
 impl eframe::App for App {
@@ -53,12 +55,33 @@ impl eframe::App for App {
             ui.label(desc);
             ui.separator();
             if self.page == 0 {
-                // ponytail: 占位按钮，禁用；M3 接通功能后去掉 add_enabled(false)。
                 ui.horizontal(|ui| {
-                    let _ = ui.add_enabled(false, egui::Button::new("封装体检"));
+                    if ui.button("封装体检").clicked() {
+                        // ponytail: 同步执行（只读、秒回）；卡顿再上线程。
+                        self.doctor_report = Some(crate::doctor::run(std::path::Path::new(".")));
+                    }
+                    // ponytail: 开始封装 = M4（依赖 install/once 全链路），占位禁用。
                     let _ = ui.add_enabled(false, egui::Button::new("开始封装"));
                 });
                 ui.add_space(4.0);
+                if let Some(report) = &self.doctor_report {
+                    ui.separator();
+                    for item in &report.items {
+                        let mark = if item.ok { "✓" } else { "✗" };
+                        if item.ok {
+                            ui.label(format!("{mark} {}", item.name));
+                        } else {
+                            ui.label(format!("{mark} {} — {}", item.name, item.detail));
+                        }
+                    }
+                    let verdict = if report.passed() {
+                        "体检通过"
+                    } else {
+                        "存在未通过项"
+                    };
+                    ui.separator();
+                    ui.strong(format!("结论: {verdict}"));
+                }
             }
             ui.label("功能对接进行中（M3）：见 docs/spec/capabilities.md。");
         });
