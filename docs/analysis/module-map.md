@@ -341,3 +341,18 @@ Rust 侧：**不实现**（该载荷属于防流氓/KR 线专属，功能不在�
 - **局限**（实测）：① 线性扫描分不清 `.text` 里的数据（Delphi 把 RTTI/resourcestring/窗体表放在 `.text`）→ 指令级计数不可全信，读语义需 IDR/Ghidra/`r2 -A`；② 无符号；③ **不能按 API 名 grep 调用点**（API 走运行期解析，且重建镜像把尾部节区并进 `.rsrc`，PE 导入视图不可靠）
 - Delphi 补名办法（任何反汇编器都要做）：**DFM 事件名 = 真实函数名** + VMT/RTTI 里的类名/单元名（已提取 76 个单元名、7 个窗体类）+ `register` 调用约定人工校正
 - **函数图 + 字面量 xref**（`tools/scpt/xref.py`，替代反编译器）：72,640 函数边界 + 9,422 条字面量引用 → 直接得到「哪个函数写了哪条注册表/路径/URL」；已定位上报计费接口（`api.sysceo.cn`、`lm.sysceo.cn/getScauth`）、HAL 设备清理、驱动签名策略、SRS 驱动加载等锚点。详见 `docs/analysis/disassembly.md`
+
+### 7.2 函数级行为锚点（摘要，完整表见 `docs/analysis/disassembly.md`）
+
+| 函数 | 引用字面量 | 对应本表章节 |
+|---|---|---|
+| `0x008b424c` / `0x008b26a0` / `0x008b2748` / `0x008b285e` / `0x008b2880` | `[Sysprep.Systemsettings]` Begin/End/Network/Domain/**ClearReg**/Savesysset | §3.2（27 次标注的主流程） |
+| `0x008b47e1` / `0x0090fa89` / `0x00911300` | `[Sysprep.RemoveDriver]`、`[Sysprep.LoadsrsDrivers] OS Win10` | §3.5 驱动 |
+| `0x0089adee` / `0x00891f78` | `\System32\drivers\`、`\SystemRoot\System32\drivers\` | §3.5 / §3.13 |
+| `0x008affcd` / `0x008b0049` | `reg delete ...\Enum\Root\ACPI_HAL /f` | §3.2 换机兼容 |
+| `0x007fca3b` / `0x007fcc47` / `0x008b3cd9` | `hiberfil.sys`、`pagefile.sys`、`swapfile.sys` | §3.9 休眠/虚拟内存 |
+| `0x007f360a` / `0x007f76e0` | `UnLocktaskbar` | §3.9 任务栏 |
+| `0x008d1284` / `0x008e1fe8` / `0x008e275d` / `0x008e424b` / `0x0093ded2` | `api.sysceo.cn/apps?us=`、`lm.sysceo.cn/getaid`、`getScauth`、`scauth?id=`、`con.sysceo.cn/sc/version.html` | §3.10 联盟计费 |
+| `0x0090d037` / `0x0091da57` / `0x0090ec52` | `DriverSigningPolicy=Ignore`、`USBSTOR\|AutoRun\|1`、`Services\intelppm` | §3.6 优化项 |
+
+**代码级旁证（§3.11）**：主程序**代码里没有** `newtabx` / `sejai` / `setedge` 字面量（UTF-16/ASCII 均无）→ 浏览器篡改**完全实现在模块内**（`FUNN` 的 DATA 载荷 `FUNB_embed`），主程序只负责搬运。这与 §3.11 的结论一致，且解释了"为什么主程序字符串扫描看不到篡改代码"。
