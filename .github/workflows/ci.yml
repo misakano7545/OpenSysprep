@@ -30,6 +30,12 @@ jobs:
         run: python -m compileall -q tools
       - name: Python 自检
         run: python -m unittest discover -s tools -v
+      - name: 红线静态审计（禁止出现推广/篡改标识）
+        run: |
+          if grep -rniE "newtabx|sejai|hao_pg|90013418|prefs_enclave" src/; then
+            echo "::error::检测到红线标识，见 docs/spec/behavior-matrix.md"
+            exit 1
+          fi
 
   windows:
     runs-on: windows-latest

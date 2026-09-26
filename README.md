@@ -7,10 +7,12 @@
 ## 路线图
 
 - [x] 阶段 0：逆向分析与证据归档（脱壳、篡改链定位）
-- [ ] 阶段 1：规格提炼（`docs/spec/`：能力清单、行为对照表）
+- [x] 阶段 1：规格提炼（[能力清单](docs/spec/capabilities.md)、[行为对照表](docs/spec/behavior-matrix.md)）
 - [ ] 阶段 2：Rust 重构（架构骨架 → 核心功能实现与测试）
 - [ ] 阶段 3：Windows VM 验收与 v0.1 发布构建
 - [ ] 阶段 4：社区审计与迭代
+
+进度记录：[`docs/progress.md`](docs/progress.md) ｜ 经验沉淀：[`docs/lessons.md`](docs/lessons.md)
 
 ## 构建 / CI
 
