@@ -100,10 +100,10 @@ fn main() -> ExitCode {
             let mut failed = 0;
             for r in &results {
                 if r.success {
-                    println!("[成功] {}", r.name);
+                    println!("[成功] ({}) {}", r.phase.label(), r.name);
                 } else {
                     failed += 1;
-                    println!("[失败] {} — {}", r.name, r.detail);
+                    println!("[失败] ({}) {} — {}", r.phase.label(), r.name, r.detail);
                 }
             }
             if results.is_empty() {
