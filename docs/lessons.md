@@ -9,6 +9,8 @@
 - Delphi 程序字符串 ASCII / UTF-16 混排：检索必须双编码并行，单编码会漏掉一半证据。
 - 组件嵌套：`FUNN` 内嵌 `FUNA/FUNB/FUNC` 二级 PE（`FUNB` 即浏览器配置组件所在）；定位证据要按「文件 → 资源 → 内嵌组件」逐层落点。
 - 短标识符（如 `we2`）命中随机字节会误报；必须看上下文字符串再下结论。
+- ASPack 会把**尾部资源**（图标 / 版本信息 / 清单）以**原样字节**存放在 `.aspack` 段的地址范围内：重建时不能丢弃壳区字节，且 `.rsrc` 的 VirtualSize 必须延伸到 `.adata` 起点，否则资源表里这些条目会指向文件外（`OUT!`）。
+- PE 重建时 `SizeOfOptionalHeader` 在 **COFF 头**（`e_lfanew+20`），不是 OptionalHeader 的 Magic 字段；取错会让节表整体偏移 0x2B，产物节表报废（资源仍可按 RVA 直读，但外部工具解析不了）。
 
 ## 工程 / CI
 

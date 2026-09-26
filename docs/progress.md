@@ -37,3 +37,11 @@
 - 新增依赖：`serde` + `toml`（TOML 1.0 官方方案；理由：手写解析器风险大于收益）
 - 待做：GUI 对接（体检/任务页接真数据）、`install`/`uninstall`（组件自有目录）、`once`（首启执行）
 - 证据：CI Run 7 全绿（test + windows 双 job）→ https://github.com/misakano7545/OpenSysprep/actions（commit `7279e28`）
+
+## 解析补全：FUNQ 完整脱壳 + 主程序重生成（完成）
+
+- **FUNQ = `Scaddnet`**（Sysceo.com，v3.0.0.0）：SC 网络助手——宽带/ADSL 拨号连接、IP 设置、网络位置、任务栏快捷方式（资源证据：`[ADSL]`/`[宽带连接]` 配置、`.lnk` 快捷方式、`TSccnet` 网络设置窗体）；已核**零浏览器相关代码**
+- 脱壳：ASPack 2.42 完整脱壳（7/7 块 + 壳区尾部资源保留），11 节区有效、61/61 资源 IN、OEP `0x2a8b2c`；产物 `work/engines/FUNQ.unpacked.exe`（sha256 `934e9663…`）
+- 附带修复：`unpack.rebuild()` 的 `SizeOfOptionalHeader` 取值 bug（原误取 OptionalHeader Magic，节表偏移错 0x2B）→ 主程序脱壳版重生成：节表有效、205 资源；`scpt-analysis/01-unpacked/Scpt.unpacked.exe`（sha256 `34d33227…`）
+- 复现脚本入库：`tools/scpt/`（9 个脚本 + README，纯数据解压，不执行样本）
+- 文档：`docs/analysis/module-map.md`（FUNQ 待核项已消除，新增「脱壳产物与复现方法」节）
