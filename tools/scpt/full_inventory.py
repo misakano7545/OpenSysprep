@@ -46,17 +46,24 @@ def file_type(p: pathlib.Path) -> str:
 
 
 def version_info(b: bytes) -> dict:
+    """解析 VS_VERSIONINFO。
+
+    坑：String 结构是 wLength/wValueLength/wType + szKey，按 NUL 切分后**键名会粘上前一
+    字段的尾部字节**（如 'L\\x16\\x01CompanyName'）。必须用后缀匹配，否则整表恒为空。
+    """
     mag = 'VS_VERSION_INFO'.encode('utf-16-le')
     i = b.find(mag)
     if i < 0:
         return {}
     w = b[i:i + 8192].decode('utf-16-le', 'ignore')
-    toks = [t.strip() for t in w.split('\x00')]
-    toks = [t for t in toks if t]
+    toks = [t.strip() for t in w.split('\x00') if t.strip()]
     out = {}
     for j, t in enumerate(toks):
-        if t in VKEYS and j + 1 < len(toks) and toks[j + 1] not in VKEYS:
-            out[t] = toks[j + 1]
+        if j + 1 >= len(toks):
+            break
+        for k in VKEYS:
+            if t.endswith(k) and not any(toks[j + 1].endswith(k2) for k2 in VKEYS):
+                out.setdefault(k, toks[j + 1])
     return out
 
 

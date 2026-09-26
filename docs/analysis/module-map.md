@@ -1,6 +1,8 @@
 # SCPT 全量解析：模块 → 功能 → 原实现 → Rust 还原方案
 
-> 证据来源：主程序脱壳镜像（`01-unpacked/Scpt.unpacked.exe`）、45 个模块（`work/engines/`）、205 个资源、语言文件 567 条文案（其中 411 条界面控件）。
+> 证据来源：主程序脱壳镜像（`01-unpacked/Scpt.unpacked.exe`）、**42 个模块 + 3 个内嵌组件**（`work/engines/`）、205 个资源、语言文件 567 条文案（其中 411 条界面控件）。
+> 逐模块原始证据（版本信息/导入/资源/特征字符串）：`docs/analysis/module-dossiers.md`（自动生成，44 条）。
+> 校验：42 个模块中原为 UPX 加壳的 20 个，用 `upx -d` 从原包独立重脱壳后与 `work/engines` **sha256 逐一相同** → 分析基座无损。
 > 自动扫描原始输出：`work/analysis/full_inventory.md`、`feature_matrix.md`、`main_flow.txt`、`strings_detail.md`、`unknown_modules.md`、`ui_controls.txt`。
 > 目标：**功能 1:1 还原，零流氓**（不实现任何浏览器篡改、推广安装、内核锁）。
 
@@ -12,7 +14,7 @@
 
 | 层 | 组成 | 职责 |
 |---|---|---|
-| ① 主程序 | `Scpt.exe`（Delphi + ASPack） | 界面 + 封装流程编排（60 个流程标记）+ 资源仓库（45 个模块、语言、皮肤、测试数据） |
+| ① 主程序 | `Scpt.exe`（Delphi + ASPack） | 界面 + 封装流程编排（60 个流程标记）+ 资源仓库（42 个模块 + 3 个内嵌组件、语言、皮肤、测试数据） |
 | ② 部署引擎 | `FUNN` 家族（ScTasks） | 封装时被写入目标系统，首次开机执行部署（原来含浏览器篡改） |
 | ③ 辅助工具/驱动 | `FUN*` / `PUBC*` | 驱动包解压(7-Zip)、驱动安装(devcon)、权限(SetACL)、默认用户配置(DefProf)、内核驱动(Scufd.sys) 等 |
 
@@ -117,34 +119,77 @@
 
 ---
 
-## 四、45 个模块映射表
+## 四、42 个模块 + 3 个内嵌组件：逐个映射
+
+> 身份全部来自**逐模块自动解析**（版本信息资源 + 导入表 + 资源树 + 双编码字符串），原始证据见 `module-dossiers.md`。
+> PE 时间戳：`FUNN`/`FUNNX64` = 2026-05-15；`FUNNKR` 家族与 `FUNM` 家族 = 2025-05-23；`FUNO` = 2021-04-09。
+> 「伪装」= 版本信息冒充他人（Microsoft/内核）。
+
+### 4.1 部署引擎（ScTasks 线）
 
 | 模块 | 身份（证据） | 对应功能 | Rust 方案 |
 |---|---|---|---|
-| `FUNA` | IDE/HDC 控制器 INF（Win2000 5.1.2600） | SRS/磁盘控制器驱动 | 保留功能，不捆绑 INF |
-| `FUNI` | HAL/CA 相关 INF | SRS/硬件抽象层 | 同上 |
-| `FUNB` | devcon 改造版（UpdateDriverForPlugAndPlayDevicesW） | 驱动安装 | 用 `pnputil` 替代 |
-| `FUNC` | devcon 改造版（含 devcon.pdb，x64） | 驱动安装 | 同上 |
-| `FUND` | 网络设置（NetSetupPrepareSysPrep/netshell/SetupOobeBnk，伪装"sysprep utility"） | 网络位置设置 | 用 `netsh`/`PowerShell` 实现 |
-| `FUNF`/`FUNFX64` | 同 FUND | 网络位置设置 | 同上 |
-| `FUNE`/`FUNG`/`FUNGX64` | SetupCL（sysprep 的 SetupComplete 执行器，SYSTEM hive 操作） | 首启脚本执行 | 用系统自带 setupcomplete.cmd 机制 |
-| `FUNH` | NTLDR（NT 引导加载器） | 引导修复 | 剔换系统文件；需要时用 `bcdboot` |
-| `FUNJ` | SetACL（Helge Klein） | 文件/注册表权限 | 用 `icacls`/`reg` 替代 |
-| `FUNK` | 7-Zip（Igor Pavlov，13MB） | 驱动包/资源包解压 | 用系统 `tar`（Win10+ 内置）替代 |
-| `FUNM`/`FUNMKR`/`FUNMX64`/`FUNMKRX64` | ForensiT DefProf 魔改（NTUSER.DAT/SCRUNTEMP ×111） | 默认用户配置移植（首次进桌面项） | 保留功能，白名单显式项 |
-| `FUNN`/`FUNNX64` | ScTasks 部署引擎（浏览器篡改 ×86） | 部署任务执行 | 重写（剔篡改） |
-| `FUNNKR`/`FUNNKRX64` | 同引擎改名版（伪装 NT Kernel & System；无篡改标识命中） | 部署执行（另一种封装方式） | 待运行验证；Rust 只做单一洁净引擎 |
-| `FUNO`/`FUNOX64` | 部署辅助（OEM×51/部署×38/任务栏×19） | 部署时 OEM/任务栏 | 并入 once 任务项 |
-| `FUNP`/`FUNR`/`FUNS`/`FUNX`/`PUBCA`/`PUBCF` | 进度界面模块（进度界面×372–437） | 部署进度皮肤 | 轻量进度输出（不做像素还原） |
-| `FUNT`/`FUNU`/`FUNY`/`PUBCG` | 小程序（OEM/任务栏） | 辅助 | 并入 once 任务项 |
-| `FUNZ` | 界面模块（进度界面×68） | 部署界面 | 同上 |
-| `FUNQ` | **`Scaddnet`**（Sysceo.com，v3.0.0.0；ASPack 2.42 **已完整脱壳**，见下）——网络助手：`[ADSL]`/`[宽带连接]` 配置、`.lnk` 快捷方式、`TSccnet` 网络设置窗体、uMlSkin 皮肤 | 宽带/ADSL 拨号连接、IP 设置、网络位置、任务栏固定 | 用 `netsh`/`rasdial`/PowerShell 实现；已核**零浏览器相关代码** |
-| `FUNV` | OEM 素材 ZIP（`Scoem/<品牌>/`，OEM×878） | OEM 智能识别素材 | 保留功能，素材由用户提供 |
-| `FUNA_embed`/`FUNC_embed` | FUNN 内嵌组件（UPX） | 部署链子模块 | 重写 |
-| `FUNB_embed` | FUNN 内嵌 DLL（setedge + OpenSSL 加密） | **浏览器篡改 + HMAC 伪造** | **剔除** |
-| `PUBCB`/`PUBCC`/`PUBCD` | **内核驱动 scdrv/Scufd.sys**（x86/x64/NT5） | 脚本锁/防删除 | **剔除** |
-| `PUBCE` | Inno Setup 安装包（19MB） | 第三方组件安装 | **剔除**（按需用户自装） |
-| `PUBCH`/`PUBCI` | 小型 native（PUBCI 含 AUTHZ/SAM/DSROLE → 权限/账户） | 权限/账户处理 | 用系统工具替代 |
+| `FUNN` | 版本信息**匿名**：`CompanyName/FileDescription/ProductName = TOOL`（2026-05-15）；内嵌 DATA = FUNA/FUNB/FUNC | 正式部署引擎：执行部署任务 + **内嵌浏览器篡改组件** + `Mboxinstall`（软件魔盒，含 MD5 校验） | 重写为单一洁净引擎 |
+| `FUNNX64` | 同上（x64，14.6MB） | 同上 | 同上 |
+| `FUNNKR` | **伪装** `Microsoft` / `ntkrnlmp.exe` / "NT Kernel & System" / 6.1.7601.17514；**无内嵌组件**；独有 `MiniDriverInstall`、`DriverMessage`、`System32\drivers`、`CurrentControlSet\Services\ScProtect` | KR 版部署引擎：**不篡改浏览器**，改为装 mini 驱动 + 建 `ScProtect` 服务（内核态保护） | 只做洁净引擎，**不实现驱动与服务伪装** |
+| `FUNNKRX64` | 同上（x64） | 同上 | 同上 |
+
+### 4.2 系统设置 / 首启执行
+
+| 模块 | 身份（证据） | 对应功能 | Rust 方案 |
+|---|---|---|---|
+| `FUND` | **伪装** `Microsoft` / `sysprep utility` / 内部名 `sysprep.EXE` / 5.1.2600.1106 (xpsp1.020828-1920)——即 XP SP1 原件版本号；含 IE 注册表 `Internet Explorer\International`、`TypedURLs` | 网络位置/网络设置（netshell、`NetSetupPrepareSysPrep`）；另写 IE 痕迹相关键 | `netsh`/PowerShell；IE 相关**不做** |
+| `FUNF`、`FUNFX64` | 同 `FUND`（x86 / x64 两份） | 同上 | 同上 |
+| `FUNE`、`FUNG`、`FUNGX64` | **伪装** `Microsoft` / `SetupCL utility` / `Setupcl.EXE` | sysprep 首启执行器（SetupComplete + SYSTEM hive 操作） | 用系统自带 `setupcomplete.cmd` |
+| `FUNH` | NTLDR（283KB，DOS COM 形态）；内含 `ntkrnlmp.exe`/`ntkrnlup.exe`（单/多核内核与 HAL 清单） | 引导文件替换 + 内核/HAL 适配（`Sysprep.Shal`/`ChangeStandardPC`） | 需要时用 `bcdboot`；**不替换系统内核** |
+| `FUNI` | 313B INF 文本 | HAL/CA 相关 INF | 不捆绑 |
+
+### 4.3 驱动与权限
+
+| 模块 | 身份（证据） | 对应功能 | Rust 方案 |
+|---|---|---|---|
+| `FUNB` | **伪装** `Microsoft` / "Windows Setup API" / 内部名 `SETUPAPI.DLL`（x86） | devcon 改造版：`UpdateDriverForPlugAndPlayDevicesW` 装驱动 | `pnputil` |
+| `FUNC` | 同上（x64） | 同上 | `pnputil` |
+| `FUNJ` | `Helge Klein` / `SetACL` | 文件/注册表权限设置 | `icacls`/`reg` |
+| `FUNK` | 改标 `SysCeo` / "SysCeo Runtime library" / `Sczip`（内核为 Igor Pavlov 7-Zip 9.20）；内嵌 DATA = FUNA…FUNI（8 个 INF） | 驱动包/资源包解压 + 自带 SRS INF 集 | 系统 `tar`；INF 由用户提供 |
+| `PUBCB`、`PUBCC` | 内核驱动 `scdrv`（x86 / x64）；PDB `driver\nt6\objfre_win7_*\scdrv.pdb`；**服务名伪装 "Microsoft Time-Stamp Service"** | **内核驱动**：脚本/文件锁 + 强制删除 | **不实现**（零内核驱动） |
+| `PUBCD` | 同族 NT5 版（XP/2003 线，含 WoSign 签名链） | 同上 | **不实现** |
+| `PUBCI` | x64；导入 `AUTHZ/DSPARSE/DSROLE/DUI70/DUser/RPCRT4/Secur32/UxTheme/logoncli/netutils/samcli`；宽字符含 ACL 编辑器对话框控件名（`Static add ACE`/`PermissionEntry`/`objperm`/`ClearPerm`/`InheritImmediateAuditing`…） | **权限编辑 / 账户解析工具**：给文件/注册表对象设或清 ACL（DUI70+DSPARSE=现代"选择用户或组"） | 用 `icacls`；**不实现**（详见 §6.3） |
+| `PUBCH` | x64、MSVC（含 `.pdata`）；资源被厂商文本化损坏 → 无导入名/无字符串/无 manifest | **未确证**；与 `PUBCI` 同批同量级，归入权限/驱动锁链配套程序 | **不实现**（详见 §6.3） |
+
+### 4.4 用户配置 / 部署界面
+
+| 模块 | 身份（证据） | 对应功能 | Rust 方案 |
+|---|---|---|---|
+| `FUNM`、`FUNMX64` | `ForensiT Limited` / "Set Default Profile" / `Defprof` 魔改；内嵌 DATA = FUNA/FUNB/FUNE（含篡改组件） | 默认用户配置移植（`NTUSER.DAT`/`SCRUNTEMP`） | 保留功能，白名单显式项 |
+| `FUNMKR`、`FUNMKRX64` | 同上（KR 变体）；**内嵌 5 个组件 FUNA/FUNB/FUNE/FUNF/FUNG**（比 `FUNM` 多 FUNF/FUNG → 自足打包）；`FUNMKRX64` 另有 `ScProtectInstall`/`MiniDriverInstall` + ForceDelete 驱动 PDB | KR 版默认用户配置 + 驱动安装 | 同上；**不实现驱动部分** |
+| `FUNO`、`FUNOX64` | `Sysceo.com` / `ScDeployBG_x86`/`_x64`；`DecryptScdata`、`Scdata.sc` | 部署后台/背景程序（读配置、跑部署阶段） | 并入 `once` |
+| `FUNP`、`PUBCA` | `Sysceo.com` / `ScProcessBar_x86`、`ScColourProcessBar_x86` | 部署进度条 / 彩色进度条界面 | 轻量进度输出（不做像素还原） |
+| `PUBCF` | `Sysceo.com` / `Scpicm`（`TSCPM`/`TTKMF` 窗体，`/Edeploy`） | 部署图片/部署界面程序 | 同上 |
+| `PUBCG` | `SysCeo.Com` / `ScRestart`（`TFORM1`） | 部署后重启/关机提示 | 并入 `once` |
+| `FUNX` | `Sysceo.com` / `Scskipwlan`（`TSWLAN` 窗体） | 跳过 WLAN/OOBE 网络设置 | 并入 `once` |
+| `FUNY` | `SysCeo.Com` / `ScSFC`（`TFORM1`）；引用 `ScDeploy.exe`/`ScTasks.exe` | 部署辅助（SFC/部署链） | 并入 `once` |
+| `FUNT` | `Www.SysCeo.Com` / `ScClosemsbox` | 小型助手（提示框处理） | 并入 `once` |
+| `FUNU` | `SysCeo.Com` / `By:Noime` | 小型助手 | 并入 `once` |
+| `FUNZ` | 极小 Delphi 应用（资源仅 `DVCLAL`，无窗体） | 无 UI 的部署链模块 | **不实现** |
+
+### 4.5 网络 / 素材 / 推广
+
+| 模块 | 身份（证据） | 对应功能 | Rust 方案 |
+|---|---|---|---|
+| `FUNQ` | `Sysceo.com` / `Scaddnet` 3.0.0.0（**ASPack 2.42 已完整脱壳**，见 §7）——`[ADSL]`/`[宽带连接]` 配置、`.lnk`、`TSCCNET` 窗体 | 宽带/ADSL 拨号、IP 设置、网络位置、任务栏固定 | `netsh`/`rasdial`；已核**零浏览器相关代码** |
+| `FUNV` | OEM 素材 ZIP（6.5MB，`Scoem/<品牌>/`，OEM×320） | OEM 智能识别素材 | 保留功能，素材由用户提供 |
+| `FUNR` | `SysCeo.com` / "驱动总裁在线安装程序"（`TONLINESETUP`） | 联网安装驱动（驱动总裁） | **不实现**（用户自备驱动） |
+| `FUNS` | `SysCeo.com` / "软件魔盒在线安装程序"（PDB `E:\Data\Sysceo\CeoMbox\mbolinst`） | 联网安装软件魔盒（推广） | **不实现** |
+| `PUBCE` | Inno Setup 5.6.0 安装包 → `app/AppBox.exe` = `SysCeo.com`「软件魔盒」3.0.0.15 | 推广安装（软件魔盒 + aria2 + 迅雷 + 7z + 自更新） | **不实现**（清单见 §6.2） |
+
+### 4.6 内嵌组件（从 `FUNN`/`FUNM` 的 DATA 资源解出）
+
+| 组件 | 来源/身份 | 作用 | Rust 方案 |
+|---|---|---|---|
+| `FUNA_embed` | 内嵌于 `FUNN`/`FUNM`（伪装 `TOOL`/`Crun.exe`） | 部署链子模块（启动器） | 重写 |
+| `FUNB_embed` | **浏览器配置 DLL**（`bcfgs`，含 `setedge` + BoringSSL/OpenSSL 链） | 浏览器篡改 + **伪造 HMAC 使设置不可还原** | **剔除** |
+| `FUNC_embed` | 内嵌于 `FUNN`（Delphi，x86） | 部署链子模块 | 重写 |
 
 ---
 
@@ -168,11 +213,64 @@
 
 ---
 
-## 六、待核项
+## 六、待核项：核验结论（全部已核，无遗留）
 
-- `FUNNKR` 与 `FUNN` 的行为差异（是否仅改名）；
-- `PUBCE` 安装包的具体内容（第三方组件清单）；
-- `PUBCH`/`PUBCI` 的具体用途（权限/账户相关）。
+### 6.1 `FUNNKR` vs `FUNN` —— 同一引擎的两条发行线，**不是改名**
+
+| 维度 | `FUNN` / `FUNNX64` | `FUNNKR` / `FUNNKRX64` |
+|---|---|---|
+| 版本信息 | **匿名**：`CompanyName`/`FileDescription`/`ProductName` = `TOOL` | **伪装**：`Microsoft Corporation` / `ntkrnlmp.exe` / "NT Kernel & System" / `6.1.7601.17514`（Win7 SP1 内核版本号） |
+| PE 时间戳 | 2026-05-15 | 2025-05-23 |
+| 体积（x86） | 12,525,840 | 3,383,808 |
+| 内嵌 DATA 组件 | FUNA / FUNB / FUNC（**篡改组件**） | **无** |
+| 浏览器篡改标识 | `newtabx.com`、`sejai.com`、`Secure Preferences`、`User Data\Default\Secure` | **零命中**（差集为空） |
+| 独有机制 | `Mboxinstall`（软件魔盒安装 + MD5 校验） | `MiniDriverInstall`、`DriverMessage`、`System32\drivers`、`CurrentControlSet\Services\ScProtect` |
+| 窗体类 / 任务标记 | x86 有 3 个 / x64 有 4 个窗体类，**两版完全相同**；`Sysprep.*`、`Cb_*` 标记都在主程序、不在引擎 | 同 |
+
+**结论**：`KR` 是**内核化发行线**——「装 mini 驱动 + 建 `ScProtect` 服务 + 冒充系统内核」替代「劫持浏览器」；正式线反之（劫持浏览器 + 匿名版本信息）。
+两者共用同一引擎骨架与窗体集，差异集中在**尾部机制与内嵌载荷**。
+Rust 侧：只实现**单一洁净引擎**，两条线的流氓机制都不还原（§五）。
+
+### 6.2 `PUBCE` 安装包清单
+
+Inno Setup **5.6.0 (unicode)**，`AppName = 软件魔盒`；解包 **245 个文件**（`work/pubce/`）：
+
+| 组件 | 身份（版本信息） | 作用 |
+|---|---|---|
+| `app/AppBox.exe` | `SysCeo.com`「软件魔盒」3.0.0.15 | 主程序（软件商店/推荐墙 UI） |
+| `app/plug/update/AbUpdate.exe` | 软件魔盒更新模块 3.0.0.0 | 自更新 |
+| `app/plug/AbLauncher.exe` | 软件魔盒-智能模块 3.0.0.2 | 拉起/守护 |
+| `app/UninsFile/uninst.exe` + `istask.dll` | 软件魔盒-卸载 3.0.0.11 | 卸载 + 计划任务 |
+| `app/plug/aria2/aria2c.exe`、`aria2c_nt5.exe` | aria2（无版本信息） | 下载引擎（NT6/NT5 双版） |
+| `app/plug/xunlei/download/*` | `Thunder Networking Technologies` 5.0.2.289 | **迅雷 P2P 下载引擎**（含 `dl_peer_id.dll`、`XLbt.dll`） |
+| `app/plug/7z/7za.dll` | `Igor Pavlov` 7-Zip 9.20 | 解压 |
+| `app/plug/Counter.exe` | `Sysceo.com`「Counter_BD」2.0.0.0 | 计数/上报 |
+| `app/Skin/{dark,light}`、`app/Languages/{zh_cn,zh_hk,zh_tw,en_us}.ini` | — | 皮肤（182 文件）/ 多语言（4 文件） |
+| `tmp/botva2.dll`、`InnoCallback.dll` | — | Inno 皮肤/回调库 |
+
+Rust 侧：**不实现**（不捆绑、不联网推广）。
+
+### 6.3 `PUBCH` / `PUBCI` 用途 + 资源损坏（无法执行、无法复原）
+
+**事实**：两者是 **x64 小体量 native 程序**（4032B / 5007B，MSVC，含 `.pdata`），原本存放在主程序的 `DATA` 资源里。
+
+**损坏归属（厂商侧）**：原包 20 个 UPX 模块用 `upx -d` **独立重脱壳**后与 `work/engines/` 逐一 **sha256 相同**（说明我们的导出链无损）；而 PUBCH/PUBCI 在 ASPack 解压后的 `.rsrc` 流里**就已经是损坏字节**，同一区域前后的字符串表、相邻的 `LANGS/SCCHS` 均完好。
+
+**损坏模型**（用 DOS stub 逐字节反推验证）：
+
+1. 每个 `0x00` → `0x20`（空格）；
+2. GBK 非法双字节序列（前导 `0x81–0xFE` + 非法尾字节）折叠成单个 `0x3F`（`?`）。
+
+例：标准 14 字节 DOS stub `0E 1F BA 0E 00 B4 09 CD 21 B8 01 4C CD 21` 在文件里正是 `0E 1F 3F 20 3F 3F 3F 4C 3F`。
+后果：`e_lfanew`、`Machine`（`64 3F`）、节表数值字段等**不可逆丢失** → `file` 只认出 "MS-DOS executable"。
+
+**可确证部分**：
+
+- `PUBCI`：导入 `AUTHZ.dll`、`DSPARSE.dll`、`DSROLE.dll`、`DUI70.dll`、`DUser.dll`、`RPCRT4.dll`、`Secur32.dll`、`UxTheme.dll`、`logoncli.dll`、`netutils.dll`、`samcli.dll`；宽字符含 ACL 编辑器对话框控件名（`Static add ACE`、`PermissionEntry`、`objperm`、`propperm`、`ClearPerm`、`InheritImmediateAuditing`…）
+  → **权限编辑 / 账户解析工具**：`DUI70`+`DSPARSE` = 现代"选择用户或组"对话框，`SAM/DSROLE/logoncli/netutils` = 账户与 SID 解析，`AUTHZ` = 访问检查；用途是为文件/注册表对象**设置或清除 ACL**（配合 §3.13 的脚本锁）。
+- `PUBCH`：**无导入名、无字符串、无 manifest**（`.idata` 段存在但无可读导入），用途**未确证**；与 `PUBCI` 同批、同架构、同量级，归入「权限/驱动锁链的 x64 配套程序（未确证）」。
+
+Rust 侧：**不实现**（权限用系统 `icacls`/`reg`）。
 
 ## 七、脱壳产物与复现方法
 
@@ -183,5 +281,19 @@
 
 复现脚本（`tools/scpt/`；本机原始副本在 `work/analysis/`，只做纯数据解压、不执行样本）：
 - `unpack.py` — ASPack 解压核心（含块表驱动的 in-place 解压 + PE 重建）
-- `funq_finish.py` — FUNQ 收尾（本次新增：壳区尾部资源保留 + `.rsrc` 真实范围修正）
-- `finish.py` — 主程序收尾（壳区资源补丁 + 资源导出）
+- `funq_finish.py` — FUNQ 收尾（壳区尾部资源保留 + `.rsrc` 真实范围修正）
+- `finish.py` / `full10.py` — 主程序收尾（壳区资源补丁 + 资源导出）
+- `dossier.py` — **全模块 dossier 生成**：版本信息/架构/导入/资源/双编码字符串/关键词命中 → `dossier.json` + `module-dossiers.md`
+- `compare_funn_family.py` — 四变体（`FUNN`/`FUNNX64`/`FUNNKR`/`FUNNKRX64`）字符串矩阵与差集
+- `funnkr_diff.py` — `FUNN` vs `FUNNKR` 行为差异核验（任务标记/窗体/驱动服务/篡改路径）
+- `full_inventory.py`、`feature_map.py`、`strings_detail.py`、`deep_scan_unknown.py` — 盘点与检索
+
+分析产物（原始证据，`work/analysis/`）：
+
+| 产物 | 说明 |
+|---|---|
+| `dossier.json` / `module-dossiers.md` | 44 个文件逐个 dossier（本仓库 `docs/analysis/module-dossiers.md` 为同一份） |
+| `full_inventory.md` / `full_inventory.json` | 46 个文件盘点（含 3 个内嵌组件与脱壳副本） |
+| `funn_family_compare.log` / `funnkr_diff.log` | 变体差集原始输出 |
+| `work/pubce/` | `PUBCE` 解包产物（245 文件，Inno Setup 5.6.0） |
+| `work/engines/` 与 `work/engines-orig-unp/` | 脱壳模块 / 从原包独立重脱壳的校验副本 |

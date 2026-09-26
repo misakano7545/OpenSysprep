@@ -45,3 +45,13 @@
 - 附带修复：`unpack.rebuild()` 的 `SizeOfOptionalHeader` 取值 bug（原误取 OptionalHeader Magic，节表偏移错 0x2B）→ 主程序脱壳版重生成：节表有效、205 资源；`scpt-analysis/01-unpacked/Scpt.unpacked.exe`（sha256 `34d33227…`）
 - 复现脚本入库：`tools/scpt/`（9 个脚本 + README，纯数据解压，不执行样本）
 - 文档：`docs/analysis/module-map.md`（FUNQ 待核项已消除，新增「脱壳产物与复现方法」节）
+
+## 模块解析补全：三项核验 + 42 模块逐个 dossier（完成）
+
+- **逐模块 dossier**：44 个文件（42 模块 + 3 内嵌组件 + 脱壳副本）自动解析版本信息/架构/导入/资源/双编码字符串 → `docs/analysis/module-dossiers.md` + `work/analysis/dossier.json`
+- **42 个模块身份全部落地**，其中大量是**伪装**：`FUND/FUNF/FUNFX64` = 微软 `sysprep.EXE` 5.1.2600.1106（XP SP1 原件版本号）、`FUNE/FUNG/FUNGX64` = `SetupCL`、`FUNB/FUNC` = `SETUPAPI.DLL`、`PUBCB/PUBCC/PUBCD` = "Microsoft Time-Stamp Service"、`FUNNKR/FUNNKRX64` = `ntkrnlmp.exe`；而正式版 `FUNN/FUNNX64` 反而**匿名**成 `TOOL`
+- **`FUNNKR` vs `FUNN`**：同引擎两条发行线，**不是改名**——KR = mini 驱动 + `ScProtect` 服务 + 冒充内核，**零浏览器篡改**；正式线 = 内嵌 FUNA/FUNB/FUNC 篡改组件 + `Mboxinstall` 推广，**无驱动**；窗体集相同（x86 3 / x64 4），`Sysprep.*`/`Cb_*` 标记都在主程序而非引擎
+- **`PUBCE` 清单**：Inno Setup 5.6.0 → 软件魔盒 `AppBox 3.0.0.15` + `AbUpdate`/`AbLauncher`/`uninst` + aria2(nt5/nt6) + 迅雷 5.0.2.289 + 7za 9.20 + `Counter_BD`（245 文件）
+- **`PUBCH`/`PUBCI`**：`PUBCI` = 权限编辑/账户解析（AUTHZ/DUI70/DUser/DSPARSE/SAM/DSROLE + ACL 编辑器控件名）；`PUBCH` **未确证**（无导入名/无字符串）；两者资源被**厂商侧**"文本化"损坏（`0x00→0x20`、GBK 非法对→`0x3F`）→ 不可执行、不可复原
+- 修 bug：版本信息解析（键名粘着长度字段，必须**后缀匹配**）——`tools/scpt/full_inventory.py` 与 `dossier.py` 同步修正；此前该表恒为空
+- 基座可信：原包 20 个 UPX 模块用 `upx -d` 独立重脱壳，与 `work/engines` **sha256 逐一相同**

@@ -10,6 +10,9 @@
 | `funq_rsrc.py` | 手工走 PE 资源目录，检查每条资源数据是否落在文件内（IN/OUT!） |
 | `full_inventory.py` | 全模块盘点：类型、加壳、版本信息（身份/伪装）、类别关键词命中 |
 | `feature_map.py` | 模块 × 功能关键词矩阵 + 主程序流程标记提取 |
+| `dossier.py` | 全模块 dossier：版本信息/架构/子系统/节区/导入/导出/资源树/双编码字符串/关键词命中 → JSON + Markdown |
+| `compare_funn_family.py` | `FUNN`/`FUNNX64`/`FUNNKR`/`FUNNKRX64` 四变体字符串矩阵与差集 |
+| `funnkr_diff.py` | `FUNN` vs `FUNNKR` 行为差异（任务标记 / 窗体类 / 驱动服务 / 浏览器篡改路径） |
 | `strings_detail.py` | 指定模块的区分性字符串（路径/注册表/命令/中文） |
 | `deep_scan_unknown.py` | 未知模块深挖（INF 文本直接打印 + 区分性字符串） |
 
