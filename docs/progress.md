@@ -26,3 +26,10 @@
 ## 待决策（暂停项）
 
 - 许可证选择（属公开发布决策；未定前不添加 LICENSE 文件）
+
+## M3 核心功能实现与测试（进行中）
+
+- ✅ `doctor`（封装体检，只读）：CLI 子命令 `opensysprep doctor`；检查项含 sysprep.exe 存在性、系统盘、WMI 一致性等（Windows/Linux 各自实现，Linux 输出占位项）
+- ✅ 任务模型 + 白名单校验（`src/config.rs`）：`Phase`（部署前/中/后）、`Task`、`TaskPolicy.validate`（程序名白名单）；含红线回归测试（浏览器可执行名永不进默认白名单）
+- 待做：TOML 配置文件解析（读 `opensysprep.toml`）、任务执行器、GUI 对接（体检/任务页接真数据）
+- 证据：提交 `1eeac90`；CI 运行中 → https://github.com/misakano7545/OpenSysprep/actions/runs/36250982179

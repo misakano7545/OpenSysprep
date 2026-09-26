@@ -82,6 +82,68 @@ fn filename(s: &str) -> String {
     s.rsplit(['\\', '/']).next().unwrap_or(s).to_string()
 }
 
+// ── TOML 装载 ────────────────────────────────────────────────────────
+
+/// 配置文件结构（opensysprep.toml）。明文、人类可审。
+///
+/// ```toml
+/// [[task]]
+/// name = "装驱动"
+/// phase = "post"            # pre / mid / post（部署前/中/后）
+/// command = 'pnputil.exe /add-driver x.inf'
+///
+/// [policy]
+/// allowed_programs = ["pnputil.exe", "reg.exe"]
+/// ```
+#[derive(Debug, serde::Deserialize)]
+pub struct FileConfig {
+    #[serde(default)]
+    pub policy: PolicyFile,
+    #[serde(default)]
+    pub task: Vec<TaskFile>,
+}
+
+#[derive(Debug, Default, serde::Deserialize)]
+pub struct PolicyFile {
+    #[serde(default)]
+    pub allowed_programs: Vec<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct TaskFile {
+    pub name: String,
+    pub phase: String,
+    pub command: String,
+}
+
+impl FileConfig {
+    /// 从 TOML 文本解析并校验：阶段合法、命令非空、程序名全部过白名单。
+    pub fn parse(text: &str) -> Result<(Self, TaskPolicy, Vec<Task>), ConfigError> {
+        let cfg: FileConfig =
+            toml::from_str(text).map_err(|e| ConfigError(format!("TOML 解析失败: {e}")))?;
+        let policy = TaskPolicy {
+            allowed_programs: cfg.policy.allowed_programs.clone(),
+        };
+        let mut tasks = Vec::with_capacity(cfg.task.len());
+        for tf in &cfg.task {
+            let phase = Phase::from_str(&tf.phase).ok_or_else(|| {
+                ConfigError(format!(
+                    "任务 {} 的 phase「{}」不合法（pre/mid/post）",
+                    tf.name, tf.phase
+                ))
+            })?;
+            let task = Task {
+                name: tf.name.clone(),
+                phase,
+                command: tf.command.clone(),
+            };
+            policy.validate(&task)?;
+            tasks.push(task);
+        }
+        Ok((cfg, policy, tasks))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -139,5 +201,46 @@ mod tests {
             command: "chrome.exe --hijack".into(),
         };
         assert!(empty.validate(&t).is_err());
+    }
+
+    #[test]
+    fn fileconfig_parses_valid_toml() {
+        let text = r#"
+[policy]
+allowed_programs = ["pnputil.exe", "reg.exe"]
+
+[[task]]
+name = "装驱动"
+phase = "post"
+command = 'C:\Windows\pnputil.exe /add-driver x.inf'
+
+[[task]]
+name = "示例"
+phase = "部署前"
+command = "reg.exe query HKLM\\Software"
+"#;
+        let (cfg, _policy, tasks) = FileConfig::parse(text).unwrap();
+        assert_eq!(cfg.task.len(), 2);
+        assert_eq!(tasks[0].phase, Phase::Post);
+        assert_eq!(tasks[1].phase, Phase::Pre);
+    }
+
+    #[test]
+    fn fileconfig_rejects_bad_phase_and_unknown_program() {
+        let bad_phase = r#"
+[[task]]
+name = "x"
+phase = "whenever"
+command = "pnputil.exe"
+"#;
+        assert!(FileConfig::parse(bad_phase).is_err());
+
+        let bad_prog = r#"
+[[task]]
+name = "y"
+phase = "pre"
+command = "definitely_not_allowed.exe"
+"#;
+        assert!(FileConfig::parse(bad_prog).is_err());
     }
 }

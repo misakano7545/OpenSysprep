@@ -1,0 +1,21 @@
+# OpenSysprep 示例配置（TOML，明文可审）
+# 用法: opensysprep run <pre|mid|post> [此文件]
+
+[policy]
+# 任务只能调用这里声明的程序（按文件名匹配，不含路径）
+allowed_programs = [
+    "pnputil.exe",   # 驱动导入（系统自带）
+    "reg.exe",       # 注册表（系统自带）
+    "cmd.exe",       # 批处理
+]
+
+# 部署任务：phase = pre（部署前）/ mid（部署中）/ post（部署后）
+[[task]]
+name = "示例-回显"
+phase = "pre"
+command = 'cmd.exe /c echo OpenSysprep 部署前任务开始'
+
+[[task]]
+name = "示例-导入驱动（按需修改路径）"
+phase = "post"
+command = 'pnputil.exe /add-driver D:\Drivers\net\*.inf /subdirs /install'

@@ -5,6 +5,7 @@
 mod config;
 mod doctor;
 mod gui;
+mod runner;
 
 use std::env;
 use std::process::ExitCode;
@@ -27,6 +28,9 @@ fn usage() {
 用法:
   opensysprep            启动图形界面
   opensysprep gui        同上
+  opensysprep doctor     封装体检（只读）
+  opensysprep run <pre|mid|post> [配置文件]
+                         执行指定阶段的部署任务（默认读取 ./opensysprep.toml）
   opensysprep version    显示版本
   opensysprep help       显示帮助"#
     );
@@ -54,6 +58,58 @@ fn main() -> ExitCode {
             let report = doctor::run(std::path::Path::new("."));
             print!("{report}");
             if report.passed() {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(1)
+            }
+        }
+        Some("run") => {
+            let args: Vec<String> = env::args().skip(2).collect();
+            let Some(phase_str) = args.first() else {
+                eprintln!("用法: opensysprep run <pre|mid|post> [配置文件]");
+                return ExitCode::from(2);
+            };
+            let Some(phase) = config::Phase::from_str(phase_str) else {
+                eprintln!("阶段不合法: {phase_str}（pre/mid/post）");
+                return ExitCode::from(2);
+            };
+            let path = args
+                .get(1)
+                .cloned()
+                .unwrap_or_else(|| "opensysprep.toml".to_string());
+            let text = match std::fs::read_to_string(&path) {
+                Ok(t) => t,
+                Err(e) => {
+                    eprintln!("读取配置失败 {path}: {e}");
+                    return ExitCode::from(1);
+                }
+            };
+            let (_cfg, policy, tasks) = match config::FileConfig::parse(&text) {
+                Ok(v) => v,
+                Err(e) => {
+                    eprintln!("{e}");
+                    return ExitCode::from(1);
+                }
+            };
+            println!(
+                "执行阶段: {}（任务 {} 项）",
+                phase.label(),
+                tasks.iter().filter(|t| t.phase == phase).count()
+            );
+            let results = runner::run_phase(&tasks, &policy, phase);
+            let mut failed = 0;
+            for r in &results {
+                if r.success {
+                    println!("[成功] {}", r.name);
+                } else {
+                    failed += 1;
+                    println!("[失败] {} — {}", r.name, r.detail);
+                }
+            }
+            if results.is_empty() {
+                println!("该阶段无任务。");
+            }
+            if failed == 0 {
                 ExitCode::SUCCESS
             } else {
                 ExitCode::from(1)
