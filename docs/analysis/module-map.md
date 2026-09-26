@@ -155,7 +155,7 @@
 | `PUBCB`、`PUBCC` | 内核驱动 `scdrv`（x86 / x64）；PDB `driver\nt6\objfre_win7_*\scdrv.pdb`；**服务名伪装 "Microsoft Time-Stamp Service"** | **内核驱动**：脚本/文件锁 + 强制删除 | **不实现**（零内核驱动） |
 | `PUBCD` | 同族 NT5 版（XP/2003 线，含 WoSign 签名链） | 同上 | **不实现** |
 | `PUBCI` | x64；导入 `AUTHZ/DSPARSE/DSROLE/DUI70/DUser/RPCRT4/Secur32/UxTheme/logoncli/netutils/samcli`；宽字符含 ACL 编辑器对话框控件名（`Static add ACE`/`PermissionEntry`/`objperm`/`ClearPerm`/`InheritImmediateAuditing`…） | **权限编辑 / 账户解析工具**：给文件/注册表对象设或清 ACL（DUI70+DSPARSE=现代"选择用户或组"） | 用 `icacls`；**不实现**（详见 §6.3） |
-| `PUBCH` | x64、MSVC（含 `.pdata`）；资源被厂商文本化损坏 → 无导入名/无字符串/无 manifest | **未确证**；与 `PUBCI` 同批同量级，归入权限/驱动锁链配套程序 | **不实现**（详见 §6.3） |
+| `PUBCH` | x64、MSVC；**无导入表/资源/字符串**；含 `mov rax, gs:[0x60]`（PEB 自解析 API）2 处 | **防流氓线的 x64 载荷/存根**（形态确证；具体动作无据可证） | **不实现**（详见 §6.3–6.4） |
 
 ### 4.4 用户配置 / 部署界面
 
@@ -268,9 +268,40 @@ Rust 侧：**不实现**（不捆绑、不联网推广）。
 
 - `PUBCI`：导入 `AUTHZ.dll`、`DSPARSE.dll`、`DSROLE.dll`、`DUI70.dll`、`DUser.dll`、`RPCRT4.dll`、`Secur32.dll`、`UxTheme.dll`、`logoncli.dll`、`netutils.dll`、`samcli.dll`；宽字符含 ACL 编辑器对话框控件名（`Static add ACE`、`PermissionEntry`、`objperm`、`propperm`、`ClearPerm`、`InheritImmediateAuditing`…）
   → **权限编辑 / 账户解析工具**：`DUI70`+`DSPARSE` = 现代"选择用户或组"对话框，`SAM/DSROLE/logoncli/netutils` = 账户与 SID 解析，`AUTHZ` = 访问检查；用途是为文件/注册表对象**设置或清除 ACL**（配合 §3.13 的脚本锁）。
-- `PUBCH`：**无导入名、无字符串、无 manifest**（`.idata` 段存在但无可读导入），用途**未确证**；与 `PUBCI` 同批、同架构、同量级，归入「权限/驱动锁链的 x64 配套程序（未确证）」。
+- `PUBCH`（x64，4032B）**无导入名、无字符串、无 manifest**——第一轮只能判"未确证"。第二轮专项反查后的结论见 §6.4。
 
 Rust 侧：**不实现**（权限用系统 `icacls`/`reg`）。
+
+### 6.4 `PUBCH` 专项反查（第二轮：引用点 + 载荷特征）
+
+**反查路径与结果**：
+
+| 反查手段 | 结果 |
+|---|---|
+| 损坏 stub 在全镜像的位置 | 仅 **2 处**：`0x51e1b1c`（= PUBCH 资源 RVA `0x51e1adc` + `0x40`）、`0x51e2adc`（= PUBCI RVA + `0x40`）→ **无完好副本**；损坏发生在厂商存资源之前 |
+| 模块名引用（全模块 + 主程序搜 `PUBCH`/`PUBCI`） | **0 处**（各模块里的 `PUB` 命中全是 Delphi RTTI 噪声 `NonPublicType`/`IsPublicType`）→ 名字不落地，由**加密配置**（见更新日志「配置文件私人专属加密」）驱动落盘 |
+| 宽字符提取 | PUBCH **0 条**；PUBCI 28 条 = 完整 ACL 编辑器控件名集（`ACEEditor`/`ACEType`/`PermissionsList`/`objperm`/`propPermHeader`/`InheritImmediateAuditing`/`ChangePrincipal`/`ShowBasic`…） |
+| x64 代码惯用法 | PUBCH 含 **`mov rax, gs:[0x60]`（PEB）两处**（损坏形态 `65 48 3F 25 60 20 20 20`，按损坏模型可复原为 `65 48 8B 04 25 60 00 00 00`）；PUBCI **0 处** |
+
+**判定**：`PUBCH` = **无导入表 + 经 PEB 自解析 API 的小型 x64 载荷/存根**（不是常规可执行程序：没有导入、资源、清单、版本信息，也没有任何字符串常量可达路径）。
+**具体动作仍无法确证**——没有任何字符串/资源可作依据，仅能确定其"载荷形态"。
+
+**语境（不作确证，仅记录）**：更新日志（`scpt-analysis/04-evidence/公告.txt`）显示防流氓线长期主线：
+- `3.0.0.122`（2021-05-21）「新增 SC 部署过程中防止文件被删除的保护功能 [仅支持 防流氓封装方式/大客户封装方式]」
+- `3.0.0.119`（2021-04-10）「新增 SC 配置文件私人专属加密功能 [同上两种封装方式]」
+- `3.0.0.98`「部署主控被劫持的行为处理选项」；几乎每个版本都写「加强/升级防流氓机制代码」
+- `3.0.0.178`（2026-05-15）「加强防流氓机制代码」
+
+Rust 侧：**不实现**（该载荷属于防流氓/KR 线专属，功能不在还原范围内）。
+
+### 6.5 附带查获（本轮新增证据）
+
+| 证据 | 内容 |
+|---|---|
+| 主程序内嵌 **ZIP 驱动包** | `ScProtect_10x64.sys`、`ScProtect_81x64.sys`、`ScProtect_8x64.sys`、`ScProtect_7x64.sys`（Win10/8.1/8/7 各一），由 `MiniDriverInstall`/`ScProtectInstall` 安装 |
+| 驱动伪装名（确认） | `PUBCB`/`PUBCC` = **"Microsoft Time-Stamp Service"**；`PUBCD` = **"WoSign Time Stamping Service"** |
+| `ScProtect` 引用者 | `FUNM`(2)、`FUNMX64`(2)、`FUNNKR`(2)、`FUNNKRX64`(2)、`FUNMKR`(10)、`FUNMKRX64`(10) → **KR/防流氓线专属**（正式线 `FUNN` 不引用） |
+| 主程序内嵌 **OEM 素材包** | `Scoem/<品牌>/…`（223 个成员：Acer/Alienware/Apple/Asus/BenQ/Compaq/Dell/Founder/Fujitsu/GreatWall/Haier/Hasee/Hedy/Hisense/HP/HUAWEI/IBM/Lenovo/Microsoft/MSI/NEC/Samsung/Sony/Sysceo/TCL/Terrans Force/Thtf/Timi/Toshiba/Tsunis/VmWare + `readme.txt`），`nt5.*`/`nt6.*` 双套 |
 
 ## 七、脱壳产物与复现方法
 
