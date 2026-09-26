@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+          targets: x86_64-pc-windows-msvc
+      - name: Rust clippy（含跨目标检查）
+        run: |
+          cargo clippy --all-targets -- -D warnings
+          cargo check --target x86_64-pc-windows-msvc
+      - name: Rust 自检
+        run: cargo test
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Python 语法检查
+        run: python -m compileall -q tools
+      - name: Python 自检
+        run: python -m unittest discover -s tools -v
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Rust 自检
+        run: cargo test
+      - name: 构建（Windows）
+        run: cargo build --release
+      - name: 运行验证（确保产物可运行）
+        run: |
+          $out = & .\target\release\opensysprep.exe version
+          Write-Host $out
+          if ($LASTEXITCODE -ne 0 -or $out -notmatch "OpenSysprep") { throw "运行验证失败: $out" }
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: opensysprep-windows-amd64
+          path: target/release/opensysprep.exe

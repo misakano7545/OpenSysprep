@@ -1,0 +1,10 @@
+[package]
+name = "opensysprep"
+version = "0.0.1"
+edition = "2021"
+description = "系统封装/部署工具 —— 净化的开源重构（OpenSysprep）"
+repository = "https://github.com/misakano7545/OpenSysprep"
+
+[profile.release]
+strip = true
+lto = true

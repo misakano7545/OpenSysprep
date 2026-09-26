@@ -1,0 +1,9 @@
+dist/
+target/
+work/
+*.exe
+*.zip
+*.7z
+*.raw
+*.unp
+__pycache__/
