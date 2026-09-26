@@ -8,3 +8,6 @@ repository = "https://github.com/misakano7545/OpenSysprep"
 [profile.release]
 strip = true
 lto = true
+
+[dependencies]
+eframe = "0.32.3"

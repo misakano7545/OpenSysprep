@@ -17,12 +17,10 @@ jobs:
         with:
           components: clippy
           targets: x86_64-pc-windows-msvc
-      - name: Rust clippy（含跨目标检查）
+      - name: Rust clippy（含跨目标检查；不链接，GUI 编译交 Windows job）
         run: |
           cargo clippy --all-targets -- -D warnings
           cargo check --target x86_64-pc-windows-msvc
-      - name: Rust 自检
-        run: cargo test
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"

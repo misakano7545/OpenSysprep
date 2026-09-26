@@ -1,7 +1,8 @@
-//! OpenSysprep —— 系统封装/部署工具（由「系统总裁封装工具」逆向分析后的洁净重构）。
+//! OpenSysprep —— 系统封装/部署工具（由「系统总裁封装工具」反编译成果洁净重写）。
 //!
-//! ponytail: 只留 version/help 保证「构建 → 运行 → CI」闭环；
-//! 功能子命令按路线图逐个加，每个都带测试。
+//! 无参数启动 = GUI（对齐原工具体验）；功能子命令按 docs/spec/ 逐个对接。
+
+mod gui;
 
 use std::env;
 use std::process::ExitCode;
@@ -22,6 +23,8 @@ fn usage() {
         r#"OpenSysprep —— 系统封装/部署工具
 
 用法:
+  opensysprep            启动图形界面
+  opensysprep gui        同上
   opensysprep version    显示版本
   opensysprep help       显示帮助"#
     );
@@ -33,10 +36,18 @@ fn main() -> ExitCode {
             println!("{}", version_line());
             ExitCode::SUCCESS
         }
-        Some("help" | "--help" | "-h") | None => {
+        Some("help" | "--help" | "-h") => {
             usage();
             ExitCode::SUCCESS
         }
+        Some("gui" | "--gui") | None => match gui::run() {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("GUI 启动失败: {e}");
+                eprintln!("（无图形环境时请使用 CLI：opensysprep help）");
+                ExitCode::from(1)
+            }
+        },
         Some(other) => {
             eprintln!("未知命令: {other}");
             eprintln!();
