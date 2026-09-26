@@ -31,5 +31,9 @@
 
 - ✅ `doctor`（封装体检，只读）：CLI 子命令 `opensysprep doctor`；检查项含 sysprep.exe 存在性、系统盘、WMI 一致性等（Windows/Linux 各自实现，Linux 输出占位项）
 - ✅ 任务模型 + 白名单校验（`src/config.rs`）：`Phase`（部署前/中/后）、`Task`、`TaskPolicy.validate`（程序名白名单）；含红线回归测试（浏览器可执行名永不进默认白名单）
-- 待做：TOML 配置文件解析（读 `opensysprep.toml`）、任务执行器、GUI 对接（体检/任务页接真数据）
-- 证据：提交 `1eeac90`；CI 运行中 → https://github.com/misakano7545/OpenSysprep/actions/runs/36250982179
+- ✅ TOML 配置装载（`FileConfig::parse`）：解析 `opensysprep.toml` + 全量校验（阶段合法、命令非空、程序名过白名单）；示例 `examples/opensysprep.example.toml`
+- ✅ 任务执行器（`src/runner.rs`）+ `run` 子命令：按阶段执行；执行前**二次白名单校验**（防配置被外部改动）；失败任务显式报告不隐藏
+- ✅ CI 事故修复：clippy `-D warnings` 拒绝 `RunOutcome.phase` 未读取 → 输出中展示阶段（`1eeac90` 红 → `7279e28` 绿）
+- 新增依赖：`serde` + `toml`（TOML 1.0 官方方案；理由：手写解析器风险大于收益）
+- 待做：GUI 对接（体检/任务页接真数据）、`install`/`uninstall`（组件自有目录）、`once`（首启执行）
+- 证据：CI Run 7 全绿（test + windows 双 job）→ https://github.com/misakano7545/OpenSysprep/actions（commit `7279e28`）
